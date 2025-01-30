@@ -1,61 +1,73 @@
 from qdrant_client import QdrantClient
-from llama_index.llms.ollama import Ollama
-from llama_index.core import SimpleDirectoryReader
+from llama_index.core import Settings, SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.memory import ChatMemoryBuffer
-from llama_index.core import ServiceContext, VectorStoreIndex
+from llama_index.llms.ollama import Ollama
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.core.storage.storage_context import StorageContext
-
 import warnings
+from llama_index.core import Settings
+from llama_index.core import StorageContext
+from llama_index.core.storage.docstore import SimpleDocumentStore
 warnings.filterwarnings("ignore")
+
 
 class AIVoiceAssistant:
     def __init__(self):
         self._qdrant_url = "http://localhost:6333"
         self._client = QdrantClient(url=self._qdrant_url, prefer_grpc=False)
-        self._llm = Ollama(model="mistral", request_timeout=120.0)
-        self._service_context = ServiceContext.from_defaults(llm=self._llm, embed_model="local")
+        
+        # Configure global settings
+        Settings.llm = Ollama(model="mistral", request_timeout=120.0)
+        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self._index = None
         self._create_kb()
         self._create_chat_engine()
 
-    def _create_chat_engine(self):
-        memory = ChatMemoryBuffer.from_defaults(token_limit=1500)
-        self._chat_engine = self._index.as_chat_engine(
-            chat_mode="context",
-            memory=memory,
-            system_prompt=self._prompt,
-        )
-
     def _create_kb(self):
         try:
-            reader = SimpleDirectoryReader(
-                input_files=[r"rag\restaurant_file.txt"]
-            )
+            reader = SimpleDirectoryReader(input_files=[r"/Users/jayantsankhi/Documents/GitHub/RAG-AI-Voice-assistant-/rag/restaurant_file.txt"])
             documents = reader.load_data()
+            
+            # Initialize QdrantVectorStore
             vector_store = QdrantVectorStore(client=self._client, collection_name="kitchen_db")
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            self._index = VectorStoreIndex.from_documents(
-                documents, service_context=self._service_context, storage_context=storage_context
+
+            docstore = SimpleDocumentStore()
+            storage_context = StorageContext.from_defaults(vector_store= vector_store,
+            docstore=docstore
             )
+            self._index = VectorStoreIndex.from_documents(
+                documents, 
+                storage_context = storage_context  # Correct parameter
+            )
+            
             print("Knowledgebase created successfully!")
         except Exception as e:
             print(f"Error while creating knowledgebase: {e}")
 
+    def _create_chat_engine(self):
+        if self._index is not None:  # Check if the knowledge base was created successfully
+            memory = ChatMemoryBuffer.from_defaults(token_limit=1500)
+            self._chat_engine = self._index.as_chat_engine(
+                chat_mode="context",
+                memory=memory,
+                system_prompt=self._prompt,
+            )
+        else:
+            print("Knowledge base creation failed. Chat engine cannot be created.")
+
     def interact_with_llm(self, customer_query):
-        AgentChatResponse = self._chat_engine.chat(customer_query)
-        answer = AgentChatResponse.response
-        return answer
+        response = self._chat_engine.chat(customer_query)
+        return response.response
 
     @property
     def _prompt(self):
-        return """
-            You are a professional AI Assistant receptionist working in Aditya's one of the best restaurant called Adii's Khana Khazana,
-            Ask questions mentioned inside square brackets which you have to ask from customer, DON'T ASK THESE QUESTIONS 
-            IN ONE go and keep the conversation engaging ! always ask question one by one only!
-            
-            [Ask Name and contact number, what they want to order and end the conversation with greetings!]
+        return (
+        '''“You are a professional AI assistant working for Government of Maharashtra to help individuals with their queries regarding the Slum Rehabilitation Authority, Brihanmumbai”
+        “Whatever questions people ask to you, process them properly, and answer in simple and understandable language. and in 40 words only ”
 
-            If you don't know the answer, just say that you don't know, don't try to make up an answer.
-            Provide concise and short answers not more than 10 words, and don't chat with yourself!
-            """
+            “If you do not know the answer, just say so - don’t make up information. In that case, also mention that you will pass on the querry to our human expert of officers and get back to them.”
+
+            “If the question is outside of your knowledge base dataset then ask the person to just stick to the specific use case of the bot”
+
+            "Provide concise responses and do not hallucinate or chat with yourself”'''
+        )

@@ -13,7 +13,6 @@ DEFAULT_CHUNK_LENGTH = 10
 
 ai_assistant = AIVoiceAssistant()
 
-
 def is_silence(data, max_amplitude_threshold=3000):
     """Check if audio data contains silence."""
     max_amplitude = np.max(np.abs(data))
@@ -23,7 +22,12 @@ def is_silence(data, max_amplitude_threshold=3000):
 def record_audio_chunk(audio, stream, chunk_length=DEFAULT_CHUNK_LENGTH):
     frames = []
     for _ in range(0, int(16000 / 1024 * chunk_length)):
-        data = stream.read(1024)
+        try:
+            data = stream.read(1024, exception_on_overflow=False)  # Avoid crash on overflow
+        except OSError:
+            print("Audio input overflowed. Skipping this chunk.")
+            return True  # Return True to indicate silence and prevent further processing
+        
         frames.append(data)
 
     temp_file_path = 'temp_audio_chunk.wav'
@@ -45,8 +49,6 @@ def record_audio_chunk(audio, stream, chunk_length=DEFAULT_CHUNK_LENGTH):
         print(f"Error while reading audio file: {e}")
         return False
 
-    
-
 def transcribe_audio(model, file_path):
     segments, info = model.transcribe(file_path, beam_size=7)
     transcription = ' '.join(segment.text for segment in segments)
@@ -54,38 +56,40 @@ def transcribe_audio(model, file_path):
 
 
 def main():
-    
     model_size = DEFAULT_MODEL_SIZE + ".en"
-    model = WhisperModel(model_size, device="cuda", compute_type="float16", num_workers=10)
-    
+    model = WhisperModel(model_size, device="cpu", compute_type="float32", num_workers=10)
     audio = pyaudio.PyAudio()
-    stream = audio.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=1024)
+    stream = audio.open(format=pyaudio.paInt16, 
+                    channels=1, 
+                    rate=16000, 
+                    input=True, 
+                    frames_per_buffer=2048,  # Increased buffer size
+                    input_device_index=None)
+
     customer_input_transcription = ""
 
     try:
         while True:
             chunk_file = "temp_audio_chunk.wav"
-            
-            # Record audio chunk
+
+            # Restart stream if closed
+            if not stream.is_active():
+                stream.start_stream()
+
             print("_")
             if not record_audio_chunk(audio, stream):
-                # Transcribe audio
                 transcription = transcribe_audio(model, chunk_file)
                 os.remove(chunk_file)
                 print("Customer:{}".format(transcription))
-                
-                # Add customer input to transcript
+
                 customer_input_transcription += "Customer: " + transcription + "\n"
-                
-                # Process customer input and get response from AI assistant
                 output = ai_assistant.interact_with_llm(transcription)
+                
                 if output:
                     output = output.lstrip()
                     vs.play_text_to_speech(output)
                     print("AI Assistant:{}".format(output))
 
-
-    
     except KeyboardInterrupt:
         print("\nStopping...")
 
@@ -96,3 +100,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
