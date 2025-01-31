@@ -8,9 +8,13 @@ import voice_service as vs
 from rag.AIVoiceAssistant import AIVoiceAssistant
 from langdetect import detect  # For language detection
 from deep_translator import GoogleTranslator  # For translation
+import os 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize OpenAI client
-client = OpenAI(api_key="key")
+client = OpenAI(api_key=os.environ.get("API_key_openai"))
 # Initialize AI Assistant
 ai_assistant = AIVoiceAssistant()
 

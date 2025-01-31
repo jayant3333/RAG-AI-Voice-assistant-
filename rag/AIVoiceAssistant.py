@@ -1,7 +1,4 @@
-
 import openai
-
-
 from qdrant_client import QdrantClient
 from llama_index.core import Settings, SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.memory import ChatMemoryBuffer
@@ -11,12 +8,13 @@ from llama_index.llms.openai import OpenAI  # Updated to use OpenAI
 import warnings
 from llama_index.core import StorageContext
 from llama_index.core.storage.docstore import SimpleDocumentStore
+import os
+from dotenv import load_dotenv
 
 warnings.filterwarnings("ignore")
-
+load_dotenv()
 # Set your OpenAI API key
-openai.api_key = "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"
-
+openai.api_key = os.environ.get("API_key_openai")
 class AIVoiceAssistant:
     def __init__(self):
         self._qdrant_url = "http://localhost:6333"
@@ -69,7 +67,7 @@ class AIVoiceAssistant:
     @property
     def _prompt(self):
         return (
-            '''“You are a professional AI assistant working for Government of Maharashtra to help individuals with their queries regarding the Slum Rehabilitation Authority, Brihanmumbai”
+            '''“You are a professional AI assistant working for Government of Maharashtra to help individuals with their queries regarding the Slum Rehabilitation Authority, BMC”
             “Whatever questions people ask to you, process them properly, and answer in simple and understandable language. and in 40 words only ”
 
             “If you do not know the answer, just say so - don’t make up information. In that case, also mention that you will pass on the query to our human expert of officers and get back to them.”
