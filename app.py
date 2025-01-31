@@ -10,8 +10,7 @@ from langdetect import detect  # For language detection
 from deep_translator import GoogleTranslator  # For translation
 
 # Initialize OpenAI client
-client = OpenAI(api_key="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")
-
+client = OpenAI(api_key="key")
 # Initialize AI Assistant
 ai_assistant = AIVoiceAssistant()
 
