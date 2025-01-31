@@ -12,12 +12,10 @@ import warnings
 from llama_index.core import StorageContext
 from llama_index.core.storage.docstore import SimpleDocumentStore
 
-
 warnings.filterwarnings("ignore")
 
 # Set your OpenAI API key
 openai.api_key = "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"
-
 
 class AIVoiceAssistant:
     def __init__(self):
@@ -80,3 +78,6 @@ class AIVoiceAssistant:
 
             "Provide concise responses and do not hallucinate or chat with yourself”'''
         )
+    
+
+
